@@ -1,0 +1,27 @@
+[
+  {
+    "id": 1,
+    "title": "Cox's Bazar Sea Beach",
+    "content": "The world's longest natural sandy sea beach located in Bangladesh. Famous for its beautiful sunset views, surfing waves, and fresh seafood restaurants."
+  },
+  {
+    "id": 2,
+    "title": "Sajek Valley and Hills",
+    "content": "An engineering marvel of nature located in Rangamati. Known for its mesmerizing green hills, floating clouds, and serene resort stay options high above sea level."
+  },
+  {
+    "id": 3,
+    "title": "Sundarbans Mangrove Forest",
+    "content": "The largest mangrove forest in the world, home to the famous Royal Bengal Tiger. Offers thrilling boat cruise tours through narrow rivers and wildlife spotting."
+  },
+  {
+    "id": 4,
+    "title": "Sylhet Tea Gardens and Swamp Forest",
+    "content": "Famous for lush green tea gardens, Jaflong hills, and the beautiful Ratargul swamp forest. Ideal for nature trekking, boat riding, and peaceful holidays."
+  },
+  {
+    "id": 5,
+    "title": "Saint Martin's Coral Island",
+    "content": "The only coral island in Bangladesh featuring crystal clear blue water, coconut trees, and beautiful sea beaches. Perfect for scuba diving and beach camping."
+  }
+]

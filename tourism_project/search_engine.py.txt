@@ -1,0 +1,136 @@
+import json
+import math
+import re
+import nltk
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+
+# NLTK এর প্রয়োজনীয় কম্পোনেন্ট ডাউনলোড করা
+nltk.download('stopwords', quiet=True)
+nltk.download('wordnet', quiet=True)
+
+class TourismSearchEngine:
+    def __init__(self, data_file):
+        self.lemmatizer = WordNetLemmatizer()
+        self.stop_words = set(stopwords.words('english'))
+        self.documents = {}
+        self.inverted_index = {}
+        self.doc_lengths = {}
+        
+        self.load_data(data_file)
+        self.create_inverted_index()
+        self.calculate_tfidf_weights()
+
+    def clean_text(self, text):
+        """টেক্সট প্রিপসেসিং: ছোট হাতের অক্ষর করা, স্টপ-ওয়ার্ড বাদ দেওয়া এবং লেমাটাইজ করা"""
+        text = text.lower()
+        words = re.findall(r'\b\w+\b', text) # পাংচুয়েশন বাদ দিয়ে শুধু শব্দ নেওয়া
+        return [self.lemmatizer.lemmatize(w) for w in words if w not in self.stop_words]
+
+    def load_data(self, path):
+        """JSON ডেটাসেট লোড করা"""
+        with open(path, 'r') as f:
+            data = json.load(f)
+            for item in data:
+                self.documents[item['id']] = item
+
+    def create_inverted_index(self):
+        """কাস্টম ইনভার্টেড ইনডেক্স তৈরি: term -> {doc_id: frequency}"""
+        for doc_id, doc in self.documents.items():
+            # টাইটেল এবং কনটেন্ট একসাথে যোগ করে ইনডেক্স করা
+            full_text = f"{doc['title']} {doc['content']}"
+            tokens = self.clean_text(full_text)
+            
+            for token in tokens:
+                if token not in self.inverted_index:
+                    self.inverted_index[token] = {}
+                # ফ্রিকোয়েন্সি বা কতবার আছে তা গণনা করা
+                self.inverted_index[token][doc_id] = self.inverted_index[token].get(doc_id, 0) + 1
+
+    def calculate_tfidf_weights(self):
+        """ডকুমেন্টের ভেক্টর লেন্থ প্রি-ক্যালকুলেট করা (র‍্যাঙ্কিংয়ের জন্য)"""
+        N = len(self.documents)
+        for term, docs in self.inverted_index.items():
+            df = len(docs)
+            idf = math.log(N / df) if df > 0 else 0
+            for doc_id, tf in docs.items():
+                self.doc_lengths[doc_id] = self.doc_lengths.get(doc_id, 0) + (tf * idf)**2
+        
+        for doc_id in self.doc_lengths:
+            self.doc_lengths[doc_id] = math.sqrt(self.doc_lengths[doc_id])
+
+    def search(self, query, mode="OR"):
+        """কুয়েরি প্রসেসিং এবং Cosine Similarity দিয়ে র‍্যাঙ্কিং"""
+        query_tokens = self.clean_text(query)
+        if not query_tokens: return []
+
+        # Boolean Logic (AND / OR) অনুযায়ী ফিল্টারিং
+        token_docs = []
+        for t in query_tokens:
+            if t in self.inverted_index:
+                token_docs.append(set(self.inverted_index[t].keys()))
+            else:
+                if mode == "AND":
+                    return [] # AND মোডে একটি শব্দ না মিললে পুরো রেজাল্ট খালি আসবে
+        
+        if not token_docs: return []
+
+        if mode == "AND":
+            matched_ids = set.intersection(*token_docs)
+        else:
+            matched_ids = set.union(*token_docs)
+
+        # TF-IDF Cosine Ranking ক্যালকুলেশন
+        N = len(self.documents)
+        results = []
+        
+        for doc_id in matched_ids:
+            score = 0
+            for token in query_tokens:
+                if token in self.inverted_index and doc_id in self.inverted_index[token]:
+                    tf = self.inverted_index[token][doc_id]
+                    df = len(self.inverted_index[token])
+                    idf = math.log(N / df)
+                    score += (tf * idf) * (1 * idf) # Query tf ১ ধরে
+            
+            # ভেক্টর নরমালাইজেশন
+            final_score = score / self.doc_lengths[doc_id] if self.doc_lengths[doc_id] > 0 else 0
+            results.append((doc_id, final_score))
+
+        # সবচেয়ে বেশি ম্যাচ হওয়া রেজাল্ট উপরে রাখার জন্য সর্টিং
+        return sorted(results, key=lambda x: x[1], reverse=True)
+
+    def display(self, results):
+        if not results:
+            print("\n❌ দুঃখিত, কোনো ভ্রমণের স্থান খুঁজে পাওয়া যায়নি।")
+            return
+            
+        print(f"\n✨ মোট {len(results)}টি ম্যাচিং ট্যুরিস্ট স্পট পাওয়া গেছে:")
+        print("="*65)
+        for rank, (doc_id, score) in enumerate(results, 1):
+            doc = self.documents[doc_id]
+            # ৮০ ক্যারেক্টারের স্নীপেট বা শর্ট ডেসক্রিপশন তৈরি
+            snippet = doc['content'][:80] + "..." if len(doc['content']) > 80 else doc['content']
+            print(f"Rank {rank} [Relevancy Score: {score:.4f}]")
+            print(f"📍 Spot Name: {doc['title']}")
+            print(f"🔍 Description: {snippet}")
+            print("-" * 65)
+
+if __name__ == "__main__":
+    engine = TourismSearchEngine('dataset.json')
+    print("🌍 Custom Tourism & Travel Search Engine Initialized!")
+    
+    while True:
+        print("\n[১] Broad Search (OR) | [২] Strict Search (AND) | [৩] Exit")
+        choice = input("অপশন সিলেক্ট করো (1-3): ").strip()
+        
+        if choice == '3':
+            print("সার্চ ইঞ্জিন বন্ধ করা হচ্ছে। শুভ ভ্রমণ!")
+            break
+        elif choice in ['1', '2']:
+            search_mode = "OR" if choice == '1' else "AND"
+            query = input(f"ভ্রমণস্থলের নাম বা কী-ওয়ার্ড লেখো ({search_mode} Mode): ")
+            search_results = engine.search(query, mode=search_mode)
+            engine.display(search_results)
+        else:
+            print("ভুল ইনপুট! দয়া করে ১, ২ অথবা ৩ চাপো।")
